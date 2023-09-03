@@ -1,2 +1,2 @@
 # Praktikum MPDW
-Praktikum MPDW 2023
+File tugas praktikum 1 ada di folder `P1` dengan nama file `Praktikum 1 Pemulusan`
