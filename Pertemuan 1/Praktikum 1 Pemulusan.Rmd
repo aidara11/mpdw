@@ -197,7 +197,7 @@ akurasi_test.dma
 
 Perhitungan akurasi pada data uji menghasilkan nilai MAPE di antara 10-20 sehingga nilai akurasi ini dapat dikategorikan sebagai baik.
 
-## 2. Double Exponential Smoothing
+## 2. Double Exponential Smoothing (DES)
 
 Metode *Exponential Smoothing* adalah metode pemulusan dengan melakukan pembobotan menurun secara eksponensial. Nilai yang lebih baru diberi bobot yang lebih besar dari nilai terdahulu. Terdapat satu atau lebih parameter pemulusan yang ditentukan secara eksplisit dan hasil pemilihan parameter tersebut akan menentukan bobot yang akan diberikan pada nilai pengamatan.
 
