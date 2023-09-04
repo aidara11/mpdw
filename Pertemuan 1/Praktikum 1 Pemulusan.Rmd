@@ -1,0 +1,381 @@
+---
+title: "Pemulusan Data Harga Rata-Rata Lelang Plat Nomor Mobil di Shanghai tahun 2002-2019"
+author: "Aida Darajati"
+date: "2023-09-03"
+output: html_document
+---
+
+# Library / Packages
+
+*Package* yang digunakan: `forecast`, `graphics`, `TTR`, `TSA`. Jika belum ada, install terlebih dahulu.
+
+```{r}
+#install.packages("forecast")
+#install.packages("graphics")
+#install.packages("TTR")
+#install.packages("TSA")
+```
+
+Jika sudah ada, panggil library *package* tersebut.
+
+```{r}
+library("forecast")
+library("graphics")
+library("TTR")
+library("TSA")
+```
+
+# Data Preparation
+
+```{r}
+setwd("C:/Users/LENOVO/Documents/MPDW/mpdw/P1")
+library(readxl)
+dt <- read_xlsx("Data_Shanghai.xlsx")
+write.table(dt, "Data_Shanghai.csv", sep=",", row.names = F)
+coba <- read.csv("Data_Shanghai.csv")
+```
+
+# Impor Data
+
+```{r}
+#install.packages("rio") #install jika belum ada
+library(rio)
+datashanghai <- import("https://raw.githubusercontent.com/aidara11/mpdw/main/Data/Data_Shanghai.csv")
+```
+
+# Eksplorasi Data
+
+```{r}
+View(datashanghai)    #melihat data
+str(datashanghai)     #struktur data
+dim(datashanghai)     #dimensi data
+```
+
+Mengubah data agar terbaca sebagai data deret waktu
+
+```{r}
+datashanghai.ts <- ts(datashanghai$`Average price`)  
+str(datashanghai.ts)
+```
+
+## Menampilkan ringkasan data
+
+```{r}
+summary(datashanghai.ts)
+```
+
+## Membuat plot
+
+```{r}
+ts.plot(datashanghai.ts, xlab="Time Period", ylab="Average Price", 
+        main = "Harga Rata-Rata Lelang Plat Nomor Mobil di Shanghai")
+#membuat titik2 di plot data
+points(datashanghai.ts)      
+```
+
+Pada plot data deret waktu tersebut, dapat terlihat bahwa data berpola trend karena terjadi kenaikan sekuler jangka panjang (perubahan sistematis selama periode waktu yang panjang) dalam data. Oleh karena itu, metode pemulusan yang cocok adalah Double Moving Average (DMA) dan Double Exponential Smoothing (DES).
+
+# Pemulusan (Smoothing)
+
+## 1. Double Moving Average (DMA)
+
+### Pembagian Data
+
+```{r}
+#membagi 80% data latih (training) dan 20% data uji (testing)
+training_ma <- datashanghai[1:163,]
+testing_ma <- datashanghai[164:204,]
+train_ma.ts <- ts(training_ma$`Average price`)
+test_ma.ts <- ts(testing_ma$`Average price`)
+```
+
+### Eksplorasi Data
+
+Eksplorasi data dilakukan pada keseluruhan data, data latih serta data uji menggunakan plot data deret waktu.
+
+```{r}
+#eksplorasi keseluruhan data
+plot(datashanghai.ts, col="green",main="Plot semua data")
+points(datashanghai.ts)
+
+#eksplorasi data latih
+plot(train_ma.ts, col="orange",main="Plot data latih")
+points(train_ma.ts)
+
+#eksplorasi data uji
+plot(test_ma.ts, col="orange",main="Plot data uji")
+points(test_ma.ts)
+```
+
+Eksplorasi data juga dapat dilakukan menggunakan package `ggplot2` .
+
+```{r}
+#Eksplorasi dengan GGPLOT
+
+library(ggplot2)
+ggplot() + 
+  geom_line(data = training_ma, aes(x = Date, y = `Average price`, col = "Data Latih")) +
+  geom_line(data = testing_ma, aes(x = Date, y = `Average price`, col = "Data Uji")) +
+  labs(x = "Periode Waktu", y = "Harga Rata-rata", color = "Legend") +
+  scale_colour_manual(name="Keterangan:", breaks = c("Data Latih", "Data Uji"),
+                      values = c("orange", "blue")) + 
+  theme_bw() + theme(legend.position = "bottom",
+                     plot.caption = element_text(hjust=0.5, size=12))
+```
+
+### Metode DMA
+
+Metode pemulusan Double Moving Average (DMA) pada dasarnya mirip dengan Single Moving Average (SMA). Namun demikian, metode ini lebih cocok digunakan untuk pola data trend. Proses pemulusan dengan rata rata dalam metode ini dilakukan sebanyak 2 kali.
+
+```{r}
+data.sma <- SMA(train_ma.ts, n=4)
+
+dma <- SMA(data.sma, n = 4)
+At <- 2*data.sma - dma
+Bt <- 2/(4-1)*(data.sma - dma)
+data.dma<- At+Bt
+data.ramal2<- c(NA, data.dma)
+
+t = 1:41
+f = c()
+
+for (i in t) {
+  f[i] = At[length(At)] + Bt[length(Bt)]*(i)
+}
+
+data.gab2 <- cbind(aktual = c(train_ma.ts,rep(NA,41)), pemulusan1 = c(data.sma,rep(NA,41)),pemulusan2 = c(data.dma, rep(NA,41)),At = c(At, rep(NA,41)), Bt = c(Bt,rep(NA,41)),ramalan = c(data.ramal2, f[-1]))
+data.gab2
+
+```
+
+### Visualisasi hasil pemulusan metode DMA
+
+```{r}
+ts.plot(datashanghai.ts, xlab="Time Period ", ylab="Average Price", main= "DMA N=4 Data Shanghai Car License Plate Auction Average Price")
+points(datashanghai.ts)
+lines(data.gab2[,3],col="green",lwd=2)
+lines(data.gab2[,6],col="red",lwd=2)
+legend("topleft",c("data aktual","data pemulusan","data peramalan"), lty=8, col=c("black","green","red"), cex=0.8)
+
+```
+
+Selanjutnya perhitungan akurasi dilakukan baik pada data latih maupun data uji. Perhitungan akurasi dilakukan dengan ukuran *Sum Squares Error* (SSE), *Mean Square Error* (MSE) dan *Mean Absolute Percentage Error* (MAPE).
+
+### Akurasi Data Latih
+
+```{r}
+#Menghitung nilai keakuratan data latih
+
+error_train.dma = train_ma.ts-data.ramal2[1:length(train_ma.ts)]
+SSE_train.dma = sum(error_train.dma[8:length(train_ma.ts)]^2)
+MSE_train.dma = mean(error_train.dma[8:length(train_ma.ts)]^2)
+MAPE_train.dma = mean(abs((error_train.dma[8:length(train_ma.ts)]/train_ma.ts[8:length(train_ma.ts)])*100))
+
+akurasi_train.dma <- matrix(c(SSE_train.dma, MSE_train.dma, MAPE_train.dma))
+row.names(akurasi_train.dma)<- c("SSE", "MSE", "MAPE")
+colnames(akurasi_train.dma) <- c("Akurasi m = 4")
+akurasi_train.dma
+```
+
+Semakin kecil SSE, MSE, dan MAPE maka semakin akurat sebuah model dalam melakukan peramalan. Perhitungan akurasi pada data latih menggunakan nilai MAPE menghasilkan nilai MAPE diantara 10-20 sehingga nilai akurasi ini dapat dikategorikan baik. Selanjutnya, perhitungan nilai akurasi dilakukan pada data uji.
+
+### Akurasi Data Uji
+
+```{r}
+#Menghitung nilai keakuratan data uji
+
+error_test.dma = test_ma.ts-data.gab2[164:204,6]
+SSE_test.dma = sum(error_test.dma^2)
+MSE_test.dma = mean(error_test.dma^2)
+MAPE_test.dma = mean(abs((error_test.dma/test_ma.ts*100)))
+
+akurasi_test.dma <- matrix(c(SSE_test.dma, MSE_test.dma, MAPE_test.dma))
+row.names(akurasi_test.dma)<- c("SSE", "MSE", "MAPE")
+colnames(akurasi_test.dma) <- c("Akurasi m = 4")
+akurasi_test.dma
+```
+
+Perhitungan akurasi pada data uji menghasilkan nilai MAPE di antara 10-20 sehingga nilai akurasi ini dapat dikategorikan sebagai baik.
+
+## 2. Double Exponential Smoothing (DES)
+
+Metode *Exponential Smoothing* adalah metode pemulusan dengan melakukan pembobotan menurun secara eksponensial. Nilai yang lebih baru diberi bobot yang lebih besar dari nilai terdahulu. Terdapat satu atau lebih parameter pemulusan yang ditentukan secara eksplisit dan hasil pemilihan parameter tersebut akan menentukan bobot yang akan diberikan pada nilai pengamatan.
+
+Ada dua macam model, yaitu model tunggal dan ganda. Model tunggal atau Single Exponential Smoothing (SES) merupakan metode pemulusan yang tepat untuk data dengan pola stasioner atau konstan. Sedangkan model ganda atau Double Exponential Smoothing (DES) untuk data berpola tren. Data `harga rata-rata lelang plat nomor mobil di Shanghai` berpola tren sehingga menggunakan metode pemulusan DES.
+
+### Pembagian Data
+
+Pembagian data latih dan data uji dilakukan dengan perbandingan 80% data latih dan 20% data uji.
+
+```{r}
+#membagi 80% data latih (training) dan 20% data uji (testing)
+training <- datashanghai[1:163,]
+testing  <- datashanghai[164:204,]
+train.ts <- ts(training$'Average price')
+test.ts  <- ts(testing$'Average price')
+```
+
+### Eksplorasi Data
+
+Eksplorasi dilakukan dengan membuat plot data deret waktu untuk keseluruhan data, data latih, dan data uji.
+
+```{r}
+#eksplorasi data
+plot(datashanghai.ts, col="black",main="Plot semua data")
+points(datashanghai.ts)
+
+plot(train.ts, col="purple",main="Plot data latih")
+points(train.ts)
+
+plot(test.ts, col="red",main="Plot data uji")
+points(test.ts)
+```
+
+Eksplorasi data juga dapat dilakukan menggunakan package `ggplot2` .
+
+```{r}
+#Eksplorasi dengan GGPLOT
+library(ggplot2)
+ggplot() + 
+  geom_line(data = training, aes(x = Date, y = `Average price`, col = "Data Latih")) +
+  geom_line(data = testing, aes(x = Date, y = `Average price`, col = "Data Uji")) +
+  labs(x = "Periode Waktu", y = "Harga Rata-rata", color = "Legend") +
+  scale_colour_manual(name="Keterangan:", breaks = c("Data Latih", "Data Uji"),
+                      values = c("purple", "red")) + 
+  theme_bw() + theme(legend.position = "bottom",
+                     plot.caption = element_text(hjust=0.5, size=12))
+```
+
+### Metode DES
+
+Metode pemulusan DES digunakan untuk data yang memiliki pola tren. Metode DES adalah metode semacam SES, hanya saja dilakukan dua kali, yaitu pertama untuk tahapan 'level' dan kedua untuk tahapan 'tren'. Pemulusan menggunakan metode ini akan menghasilkan peramalan tidak konstan untuk periode berikutnya.
+
+Pemulusan dengan metode DES ini akan menggunakan fungsi `HoltWinters()` . Nilai argumen `beta` diinisialisasi bersamaan dengan nilai `alpha` dan nilai argumen `gamma` dibuat `FALSE`.
+
+```{r}
+#beta=0.2 dan alpha=0.2
+des.1<- HoltWinters(train.ts, gamma = FALSE, beta = 0.2, alpha = 0.2)
+plot(des.1)
+
+#ramalan
+ramalandes1<- forecast(des.1, h=41)     #h = panjang periode
+ramalandes1
+
+#beta=0.3 dan aplha=0.6
+des.2<- HoltWinters(train.ts, gamma = FALSE, beta = 0.3, alpha = 0.6)
+plot(des.2)
+
+#ramalan
+ramalandes2<- forecast(des.2, h=41)
+ramalandes2
+```
+
+Nilai `y` adalah nilai data deret waktu, `gamma` adalah parameter pemulusan untuk komponen musiman, `beta` adalah parameter pemulusan untuk tren, dan `alpha` adalah parameter pemulusan untuk stasioner, serta `h` adalah banyaknya periode yang akan diramalkan.
+
+### Visualisasi hasil pemulusan metode DES
+
+Selanjutnya jika ingin membandingkan plot data latih dan data uji adalah sebagai berikut.
+
+```{r}
+#Visually evaluate the prediction
+plot(datashanghai.ts)
+lines(des.1$fitted[,1], lty=2, col="purple")
+lines(ramalandes1$mean, col="red")
+```
+
+Untuk mendapatkan nilai parameter optimum dari DES, argumen `alpha` dan `beta` dapat dibuat `NULL` seperti berikut.
+
+```{r}
+#Lamda dan gamma optimum
+des.opt<- HoltWinters(train.ts, gamma = FALSE)
+des.opt
+plot(des.opt)
+
+#ramalan
+ramalandesopt<- forecast(des.opt, h=41)   #h = panjang periode
+ramalandesopt
+```
+
+Selanjutnya akan dilakukan perhitungan akurasi pada data latih maupun data uji dengan ukuran akurasi SSE, MSE dan MAPE.
+
+### Akurasi Data Latih
+
+```{r}
+#Akurasi Data Training
+ssedes.train1<-des.1$SSE
+msedes.train1<-ssedes.train1/length(train.ts)
+sisaandes1<-ramalandes1$residuals
+head(sisaandes1)
+
+mapedes.train1 <- sum(abs(sisaandes1[3:length(train.ts)]/train.ts[3:length(train.ts)])
+                      *100)/length(train.ts)
+
+akurasides.1 <- matrix(c(ssedes.train1,msedes.train1,mapedes.train1))
+row.names(akurasides.1)<- c("SSE", "MSE", "MAPE")
+colnames(akurasides.1) <- c("Akurasi lamda=0.2 dan gamma=0.2")
+akurasides.1
+
+ssedes.train2<-des.2$SSE
+msedes.train2<-ssedes.train2/length(train.ts)
+sisaandes2<-ramalandes2$residuals
+head(sisaandes2)
+
+mapedes.train2 <- sum(abs(sisaandes2[3:length(train.ts)]/train.ts[3:length(train.ts)])
+                      *100)/length(train.ts)
+
+akurasides.2 <- matrix(c(ssedes.train2,msedes.train2,mapedes.train2))
+row.names(akurasides.2)<- c("SSE", "MSE", "MAPE")
+colnames(akurasides.2) <- c("Akurasi lamda=0.6 dan gamma=0.3")
+akurasides.2
+```
+
+Hasil akurasi dari data latih skenario 2 dengan lamda=0.6 dan gamma=0.3 memiliki hasil yang lebih baik karena memiliki nilai SSE, MSE, dan MAPE yang lebih kecil. Berdasarkan nilai MAPE-nya, skenario 2 dapat dikategorikan peramalan sangat baik, sedangkan skenario 1 dikategorikan peramalan baik.
+
+### Akurasi Data Uji
+
+```{r}
+#Akurasi Data Testing
+selisihdes1 <- ramalandes1$mean - testing$`Average price`
+selisihdes1
+
+SSEtestingdes1<-sum(selisihdes1^2)
+MSEtestingdes1<-SSEtestingdes1/length(testing$`Average price`)
+MAPEtestingdes1<-sum(abs(selisihdes1/testing$`Average price`)*100)/length(testing$`Average price`)
+
+selisihdes2<-ramalandes2$mean-testing$`Average price`
+selisihdes2
+
+SSEtestingdes2<-sum(selisihdes2^2)
+MSEtestingdes2<-SSEtestingdes2/length(testing$`Average price`)
+MAPEtestingdes2<-sum(abs(selisihdes2/testing$`Average price`)*100)/length(testing$`Average price`)
+
+selisihdesopt<-ramalandesopt$mean-testing$`Average price`
+selisihdesopt
+
+SSEtestingdesopt<-sum(selisihdesopt^2)
+MSEtestingdesopt<-SSEtestingdesopt/length(testing$`Average price`)
+MAPEtestingdesopt<-sum(abs(selisihdesopt/testing$`Average price`)*100)/length(testing$`Average price`)
+
+akurasitestingdes <-
+  matrix(c(SSEtestingdes1,MSEtestingdes1,MAPEtestingdes1,SSEtestingdes2,MSEtestingdes2,
+           MAPEtestingdes2,SSEtestingdesopt,MSEtestingdesopt,MAPEtestingdesopt),
+         nrow=3,ncol=3)
+row.names(akurasitestingdes)<- c("SSE", "MSE", "MAPE")
+colnames(akurasitestingdes) <- c("des ske1","des ske2","des opt")
+akurasitestingdes
+```
+
+Hasil akurasi dari data latih `DES Opt` memiliki hasil yang lebih baik karena memiliki nilai SSE, MSE, dan MAPE yang lebih kecil dibandingkan hasil akurasi pada DES skenario 1 dan 2. Berdasarkan nilai MAPE-nya,`DES Opt` dapat dikategorikan peramalan sangat baik, sedangkan DES skenario 1 dan 2 dikategorikan peramalan baik.
+
+# Perbandingan Metode DMA dan DES
+
+```{r}
+perbandingan_metode <-
+  matrix(c(SSE_test.dma, MSE_test.dma, MAPE_test.dma, SSEtestingdesopt,MSEtestingdesopt,MAPEtestingdesopt),
+         nrow=3,ncol=2)
+row.names(perbandingan_metode)<- c("SSE", "MSE", "MAPE")
+colnames(perbandingan_metode) <- c("DMA","DES")
+perbandingan_metode
+```
+
+Metode DMA dan DES dapat dibandingkan hasilnya dengan menggunakan ukuran akurasi yang sama, yaitu SSE, MSE, dan MAPE dari data uji. Didapatkan hasil bahwa metode DES lebih baik dibandingkan metode DMA dilihat dari SSE, MSE, dan MAPE yang lebih kecil nilainya. Berdasarkan nilai MAPE-nya, metode DES memberikan peramalan dengan akurasi yang sangat baik, sedangkan metode DMA hanya memberikan peramalan dengan akurasi yang baik.
