@@ -1,0 +1,339 @@
+---
+title: "Praktikum 2 Regresi Data Pharma Sales tahun 2014-2019"
+author: "Aida Darajati"
+date: "2023-09-05"
+output: html_document
+---
+
+## Pemanggilan *Packages*
+
+```{r}
+library(dplyr)
+library(TTR)
+library(forecast)
+library(lmtest) #digunakan untuk uji formal pendeteksian autokorelasi
+library(orcutt) #untuk membuat model regresi Cochrane-Orcutt
+library(HoRM) #untuk membuat model regresi Hildreth-Lu
+```
+
+# Impor Data
+
+Data yang digunakan adalah data Pharma Sales tahun 2014-2019.
+
+```{r}
+#install.packages("rio") #install jika belum ada
+library(rio)
+datapharma <- import("https://raw.githubusercontent.com/aidara11/mpdw/main/Pertemuan%202/salesmonthly.csv")
+```
+
+## Eksplorasi Data
+
+```{r}
+View(datapharma)    #melihat data
+str(datapharma)     #struktur data
+dim(datapharma)     #dimensi data
+```
+
+### Menamakan Peubah
+
+```{r}
+y <- datapharma[,9]
+x1 <- datapharma[,2]
+x2 <- datapharma[,3]
+x3 <- datapharma[,4]
+x4 <- datapharma[,5]
+
+data <- cbind(y, x1, x2, x3, x4)
+data <- as.data.frame(data)
+```
+
+### Ringkasan data peubah respon
+
+```{r}
+summary(y)
+```
+
+### Histogram
+
+```{r}
+# Peubah Respon dan Peubah Penjelas
+
+library(ggplot2)
+ggplot(data, aes(x=y)) + 
+  geom_histogram(fill="purple", bins=15, color='black', alpha=0.7) +
+    ggtitle("Sebaran Data Peubah y") + #Title
+  theme(plot.title = element_text(hjust = 0.5)) + #Title Position +
+  ylab("Frekuensi")+xlab("Penjualan Obat R06")
+
+ggplot(data, aes(x=x1)) + 
+  geom_histogram(fill="purple", bins=15, color='black', alpha=0.7) +
+    ggtitle("Sebaran Data Peubah x1") + #Title
+  theme(plot.title = element_text(hjust = 0.5)) + #Title Position +
+  ylab("Frekuensi")+xlab("Penjualan Obat M01AB")
+
+ggplot(data, aes(x=x2)) + 
+  geom_histogram(fill="purple", bins=15, color='black', alpha=0.7) +
+    ggtitle("Sebaran Data Peubah x2") + #Title
+  theme(plot.title = element_text(hjust = 0.5)) + #Title Position +
+  ylab("Frekuensi")+xlab("Penjualan Obat M01AE")
+
+ggplot(data, aes(x=x3)) + 
+  geom_histogram(fill="purple", bins=15, color='black', alpha=0.7) +
+    ggtitle("Sebaran Data Peubah x3") + #Title
+  theme(plot.title = element_text(hjust = 0.5)) + #Title Position +
+  ylab("Frekuensi")+xlab("Penjualan Obat N02BA")
+
+ggplot(data, aes(x=x4)) + 
+  geom_histogram(fill="purple", bins=15, color='black', alpha=0.7) +
+    ggtitle("Sebaran Data Peubah x4") + #Title
+  theme(plot.title = element_text(hjust = 0.5)) + #Title Position +
+  ylab("Frekuensi")+xlab("Penjualan Obat N02BE")
+```
+
+### Matriks Korelasi
+
+```{r}
+library(ggplot2)
+library(GGally)
+
+sample_data <- data.frame(y, x1, x2, x3, x4)
+ggpairs(sample_data)
+```
+
+Berdasarkan matriks korelasi di atas, terlihat adanya hubungan / korelasi positif antara peubah y dengan peubah x1 sebesar 0.308 dan x2 sebesar 0.029, terlihat pada titik-titik plot yang naik ke arah kanan atas. Lalu terlihat pula adanya hubungan / korelasi negatif antara peubah y dengan peubah x3 sebesar -0.034 dan x4 sebesar -0.287, terlihat pada titik-titik plot yang turun ke arah kanan bawah.
+
+Setalah mengetahui adanya hubungan antar dua peubah, maka model regresi dapat ditentukan.
+
+## Regresi
+
+```{r}
+#Pembuatan Model Regresi
+#model regresi
+model<- lm(y~x1+x2+x3+x4, data = datapharma)
+summary(model)
+```
+
+Model yang dihasilkan adalah $$y=25.144+0.6594x_1+0.2947x_2+0.01718x_3-0.0825x_4$$ Berdasarkan ringkasan model dapat diketahui bahwa hasil uji F memiliki *p-value* \< $\alpha$ (5%). Artinya, minimal terdapat satu variabel yang berpengaruh nyata terhadap model. Hasil uji-t parsial parameter regresi, yaitu koefisien regresi untuk x1 dan x4 juga menunjukkan hal yang sama, yaitu memiliki *p-value* \< $\alpha$ (5%) sehingga nyata dalam taraf 5%. Selanjutnya dapat dilihat juga nilai $R^2=0.3194$. Artinya, sebesar 31.94% keragaman nilai peubah y (penjualan obat R06) dapat dijelaskan oleh peubah x (M01AB, M01AE, N02BA, N02BE). Hasil ini menunjukkan hasil yang kurang bagus, sehingga belum mendapatkan hasil terbaik. Selanjutnya, kita perlu melakukan uji terhadap sisaannya seperti berikut ini.
+
+
+### Diagnostik secara Eksploratif
+```{r}
+#sisaan dan fitted value
+sisaan <- residuals(model)
+fitValue <- predict(model)
+
+#Diagnostik dengan eksploratif
+par(mfrow = c(2,2))
+qqnorm(sisaan)
+
+qqline(sisaan, col = "steelblue", lwd = 2)
+
+plot(fitValue, sisaan, col = "steelblue", pch = 20, xlab = "Sisaan", ylab = "Fitted Values", main = "Sisaan vs Fitted Values")
+abline(a = 0, b = 0, lwd = 2)
+hist(sisaan, col = "steelblue")
+
+#plot sisaan vs urutan (sisaan saling bebas)
+plot(x = 1:dim(data)[1],
+     y = model$residual,
+     type = 'b', 
+     ylab = "Residual",
+     xlab = "Observasi")
+```
+
+Dua plot di samping kiri digunakan untuk melihat apakah sisaan menyebar normal. Normal Q-Q Plot dan histogram dari sisaan di atas menunjukkan bahwa sisaan cenderung menyebar normal. Selanjutnya, dua plot di samping kanan digunakan untuk melihat autokorelasi. Plot Sisaan vs *Fitted Value* dan Plot Sisaan vs *Order* menunjukkan adanya pola pada sisaan. Untuk lebih lanjut akan digunakan uji formal melihat normalitas sisaan dan plot ACF dan PACF untuk melihat apakah ada autokorelasi atau tidak.
+
+### Diagnostik secara Uji Formal
+```{r}
+#Melihat Sisaan Menyebar Normal/Tidak
+#H0: sisaan mengikuti sebaran normal
+#H1: sisaan tidak mengikuti sebaran normal
+shapiro.test(sisaan)
+ks.test(sisaan, "pnorm", mean=mean(sisaan), sd=sd(sisaan))
+```
+
+Berdasarkan uji formal Saphiro-Wilk dan Kolmogorov-Smirnov didapatkan nilai *p-value* \> $\alpha$ (5%). Artinya, cukup bukti untuk menyatakan sisaan berdistribusi normal.
+
+```{r}
+#ACF dan PACF identifikasi autokorelasi
+par(mfrow = c(1,2))
+acf(sisaan)
+pacf(sisaan)
+```
+
+Berdasarkan plot ACF dan PACF, terlihat semua dalam rentang batas dan tidak ada yang signifikan. Namun, untuk lebih memastikan akan dilakukan uji formal dengan uji Durbin Watson.
+
+```{r}
+#Deteksi autokorelasi dengan uji-Durbin Watson
+#H0: tidak ada autokorelasi
+#H1: ada autokorelasi
+
+#install.packages("randtests")
+library(randtests)
+runs.test(model$residuals)
+
+#install.packages("lmtest")
+library(lmtest)
+dwtest(model)
+```
+
+Berdasarkan hasil DW Test, didapatkan nilai $DW = 1.1122$ dan *p-value* = $0.0000149$. Berdasarkan tabel Durbin-Watson diperoleh nilai $DL = 0.9771$ dan $DU = 1.331$. Dengan nilai *p-value* \< 0.05 dapat disimpulkan bahwa tolak H0, cukup bukti mengatakan adanya autokorelasi. Oleh karena itu, diperlukan penanganan autokorelasi. Penanganan yang akan digunakan menggunakan dua metode, yaitu Cochrane-Orcutt dan Hildret-Lu.
+
+## Penanganan Autokorelasi
+
+### Metode Cochrane-Orcutt
+
+Penanganan metode Cochrane-Orcutt dapat dilakukan dengan bantuan packages Orcutt pada aplikasi `R` maupun secara manual. Berikut ini ditampilkan cara menggunakan bantuan `library` *packages* `Orcutt`.
+
+```{r}
+#Penanganan Autokorelasi Cochrane-Orcutt
+library(orcutt)
+modelCO <- cochrane.orcutt(model)
+modelCO
+```
+
+Hasil keluaran model setelah dilakukan penanganan adalah sebagai berikut. $$y=38.3816+0.418933x_1-0.040813x_2+0.096879x_3-0.023067x_4$$ Hasil juga menunjukkan bahwa nilai DW dan p-value meningkat menjadi $1.60645$ dan $0.05659$. Nilai *p-value* \> 0.05, artinya belum cukup bukti menyatakan bahwa sisaan terdapat autokorelasi pada taraf nyata 5%. Autokorelasi telah berhasil tertangani.
+
+Untuk nilai $ρ ̂$ optimum yang digunakan adalah $0.6312679$. Nilai tersebut dapat diketahui dengan *syntax* berikut.
+
+```{r}
+#Rho optimum
+rho <- modelCO$rho
+rho
+```
+
+Selanjutnya akan dilakukan transformasi secara manual dengan syntax berikut ini.
+
+```{r}
+#Transformasi Manual
+y.trans <- y[-1]-y[-12]*rho
+x1.trans<- x1[-1]-x1[-12]*rho
+x2.trans<- x2[-1]-x2[-12]*rho
+x3.trans<- x3[-1]-x3[-12]*rho
+x4.trans<- x4[-1]-x4[-12]*rho
+modelCOmanual<- lm(y.trans~x1.trans+x2.trans+x3.trans+x4.trans)
+summary(modelCOmanual)
+```
+
+Hasil model transformasi bukan merupakan model sesungguhnya. Koefisien regresi masih perlu dicari kembali mengikuti $β_0^*=β_0+ρ ̂β_0$ dan $β_1^*=β_1$.
+
+```{r}
+#Mencari Penduga Koefisien Regresi setelah Transformasi ke Persamaan Awal
+b0bintang <- modelCOmanual$coefficients[-2]
+b0 <- b0bintang/(1-rho)
+b1 <- modelCOmanual$coefficients[-1]
+b0
+b1
+```
+
+Hasil perhitungan koefisien regresi tersebut akan menghasilkan hasil yang sama dengan model yang dihasilkan menggunakan *packages*.
+
+### Metode Hildreth-Lu
+
+Penanganan kedua adalah menggunakan metode Hildreth-Lu. Metode ini akan
+mencari nilai SSE terkecil dan dapat dicari secara manual maupun
+menggunakan packages. Jika menggunakan packages, gunakan `library`
+*packages* `HORM`.
+
+```{r}
+#Penanganan Autokorelasi Hildreth lu
+# Hildreth-Lu
+hildreth.lu.func<- function(r, model){
+  x1 <- model.matrix(model)[,2]
+  x2 <- model.matrix(model)[,3]
+  x3 <- model.matrix(model)[,4]
+  x4 <- model.matrix(model)[,5]
+  
+  y <- model.response(model.frame(model))
+  n <- length(y)
+  t <- 2:n
+  y <- y[t]-r*y[t-1]
+  x1 <- x1[t]-r*x1[t-1]
+  x2 <- x2[t]-r*x2[t-1]
+  x3 <- x3[t]-r*x3[t-1]
+  x4 <- x4[t]-r*x4[t-1]
+  
+  
+  return(lm(y~x1+x2+x3+x4))
+}
+
+#Pencariab rho yang meminimumkan SSE
+r <- c(seq(0.1,0.9, by= 0.1))
+tab <- data.frame("rho" = r, "SSE" = sapply(r, function(i){deviance(hildreth.lu.func(i, model))}))
+round(tab, 4)
+```
+
+Pertama-tama akan dicari di mana kira-kira $ρ$ yang menghasilkan SSE
+minimum. Pada hasil di atas terlihat $ρ$ minimum ketika 0.6. Namun,
+hasil tersebut masih kurang teliti sehingga akan dicari kembali $ρ$ yang
+lebih optimum dengan ketelitian yang lebih. Jika sebelumnya jarak antar
+$ρ$ yang dicari adalah 0.1, kali ini jarak antar $ρ$ adalah 0.001 dan
+dilakukan pada selang 0.4 sampai dengan 0.5.
+
+```{r}
+#Rho optimal di sekitar 0.4
+rOpt <- seq(0.4,0.5, by= 0.001)
+tabOpt <- data.frame("rho" = rOpt, "SSE" = sapply(rOpt, function(i){deviance(hildreth.lu.func(i, model))}))
+head(tabOpt[order(tabOpt$SSE),])
+
+#Grafik SSE optimum
+par(mfrow = c(1,1))
+plot(tab$SSE ~ tab$rho , type = "l", xlab = "Rho", ylab = "SSE")
+abline(v = tabOpt[tabOpt$SSE==min(tabOpt$SSE),"rho"], lty = 2, col="red",lwd=2)
+text(x=0.500, y=71257.69	, labels = "rho=0.500", cex = 0.8)
+```
+
+Perhitungan yang dilakukan aplikasi `R` menunjukkan bahwa nilai $ρ$
+optimum, yaitu saat SSE terkecil terdapat pada nilai $ρ=0.500$. Hal
+tersebut juga ditunjukkan pada plot. Selanjutnya, model dapat didapatkan
+dengan mengevaluasi nilai $ρ$ ke dalam fungsi `hildreth.lu.func`, serta
+dilanjutkan dengan pengujian autokorelasi dengan uji Durbin-Watson.
+Namun, setelah pengecekan tersebut tidak lupa koefisien regresi tersebut
+digunakan untuk transformasi balik. Persamaan hasil transformasi itulah
+yang menjadi persamaan sesungguhnya.
+
+```{r}
+#Model terbaik
+modelHL <- hildreth.lu.func(0.500, model)
+summary(modelHL)
+
+#Transformasi Balik
+cat("y = ", coef(modelHL)[1]/(1-0.500), "+", coef(modelHL)[2],"x", sep = "")
+```
+
+Setelah dilakukan tranformasi balik, didapatkan model dengan metode
+Hildreth-Lu sebagai berikut. $$y_i=17.67857+0.47628x_1+0.01142x_2+0.08331x_3--0.03437x_4$$
+
+```{r}
+#Deteksi autokorelasi
+library(lmtest)
+dwtest(modelHL)
+```
+
+Hasil uji Durbin-Watson juga menunjukkan bawah nilai DW sebesar $1.4925$
+berada pada selang daerah tidak ada autokorelasi, yaitu pada rentang DU
+\< DW \< 4-DU. Hal tersebut juga didukung oleh
+*p-value* sebesar $0.01578$, di mana *p-value* \> $\alpha$=5%. Artinya
+tak tolak $H_0$ atau belum cukup bukti menyatakan bahwa ada autokorelasi
+dalam data nilai AQI dengan metode Hildreth-Lu pada taraf nyata 5%.
+
+Terakhir, akan dibandingkan nilai SSE dari ketiga metode (metode awal,
+metode Cochrane-Orcutt, dan Hildreth-Lu).
+
+
+## Simpulan
+```{r}
+#Perbandingan
+sseModelawal <- anova(model)$`Sum Sq`[-c(1,2,3,4)]
+sseModelCO <- anova(modelCOmanual)$`Sum Sq`[-c(1,2,3,4)]
+sseModelHL <- anova(modelHL)$`Sum Sq`[-c(1,2,3,4)]
+mseModelawal <- sseModelawal/length(y)
+mseModelCO <- sseModelCO/length(y)
+mseModelHL <- sseModelHL/length(y)
+akurasi <- matrix(c(sseModelawal,sseModelCO,sseModelHL,
+                    mseModelawal,mseModelCO,mseModelHL),nrow=2,ncol=3,byrow = T)
+colnames(akurasi) <- c("Model_Awal", "Model_Cochrane-Orcutt", "Model_Hildreth-Lu")
+row.names(akurasi) <- c("SSE","MSE")
+akurasi
+```
+
+Hasil penanganan autokorelasi dengan metode Cochrane-Orcutt dan Hildreth-Lu imemiliki nilai `SSE` sebesar $20334.5928$ dan $71257.686$. Jauh lebih rendah dibandingkan model awal dengan SSE sebesar $98760.831$. Hal ini menunjukkan bahwa model setelah penanganan lebih baik dibandingkan model awal ketika autokorelasi masih terjadi.
