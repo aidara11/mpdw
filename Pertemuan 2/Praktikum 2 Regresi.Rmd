@@ -161,7 +161,7 @@ acf(sisaan)
 pacf(sisaan)
 ```
 
-Berdasarkan plot ACF dan PACF, terlihat semua dalam rentang batas dan ada yang tidak signifikan. Namun, untuk lebih memastikan akan dilakukan uji formal dengan uji Durbin Watson.
+Berdasarkan plot ACF dan PACF, terlihat tidak semua dalam rentang batas dan ada yang tidak signifikan. Namun, untuk lebih memastikan akan dilakukan uji formal dengan uji Durbin Watson.
 
 ```{r}
 #Deteksi autokorelasi dengan uji-Durbin Watson
