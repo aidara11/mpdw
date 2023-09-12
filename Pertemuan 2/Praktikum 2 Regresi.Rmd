@@ -298,10 +298,9 @@ Hasil uji Durbin-Watson juga menunjukkan bawah nilai DW sebesar $1.4925$ berada 
 
 Terakhir, akan dibandingkan nilai SSE dari ketiga metode (metode awal, metode Cochrane-Orcutt, dan Hildreth-Lu).
 
-## Simpulan
-
 ```{r}
 #Perbandingan
+
 sseModelawal <- anova(model)$`Sum Sq`[-c(1,2,3,4)]
 sseModelCO <- anova(modelCOmanual)$`Sum Sq`[-c(1,2,3,4)]
 sseModelHL <- anova(modelHL)$`Sum Sq`[-c(1,2,3,4)]
@@ -316,3 +315,8 @@ akurasi
 ```
 
 Hasil penanganan autokorelasi dengan metode Cochrane-Orcutt dan Hildreth-Lu imemiliki nilai `SSE` sebesar $20334.5928$ dan $71257.686$. Jauh lebih rendah dibandingkan model awal dengan SSE sebesar $98760.831$. Hal ini menunjukkan bahwa model setelah penanganan lebih baik dibandingkan model awal ketika autokorelasi masih terjadi.
+
+## Simpulan
+Autokorelasi dapat dideteksi secara eksploratif melalui plot sisaan, ACF, dan PACF, serta dengan uji formal Durbin-Watson. Namun, autokorelasi tersebut dapat ditangani dengan metode Cochrane-Orcutt dan Hildreth-Lu.
+Kedua metode menghasilkan nilai SSE yang lebih kecil dibandingkan model awal, artinya keduanya baik untuk digunakan.
+Akan tetapi, masing-masing metode menghasilkan nilai SSE yang berbeda, metode Cochrane-Orcutt menghasilkan nilai SSE yang lebih kecil dibandingkan metode Hildreth-Lu. Karena itu, metode Cochrane-Orcutt lebih baik digunakan dalam menangani kasus autokorelasi pada model ini. 
