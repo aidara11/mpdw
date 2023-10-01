@@ -1,0 +1,211 @@
+---
+title: "Praktikum 5 - Data Tidak Stasioner"
+author: "Aida Darajati"
+date: "2023-09-26"
+output: html_document
+---
+
+
+```{r}
+library(ggplot2)
+library(tsibble)
+library(tseries)
+library(MASS)
+```
+
+# Impor Data
+
+```{r}
+#install.packages("rio") #install jika belum ada
+library(rio)
+datashanghai <- import("https://raw.githubusercontent.com/aidara11/mpdw/main/Data/Data_Shanghai.csv")
+head(datashanghai)
+```
+
+Ubah variabel Date menjadi index
+```{r}
+n = 204
+index <- seq(1:n)
+
+Average_price <- datashanghai$`Average price`
+
+datalelang <- cbind(index,Average_price)
+datalelang <- as.data.frame(datalelang)
+datalelang
+```
+
+Mengubah data agar terbaca sebagai data deret waktu
+```{r}
+datalelang.ts <- ts(datalelang$`Average_price`)  
+str(datalelang.ts)
+```
+
+## Stasioner dalam Rataan dan Ragam
+
+### Plot *Time Series*
+
+```{r}
+plot_data <- datalelang.ts |> as_tsibble() |> 
+  ggplot(aes(x = datalelang$index, y = datalelang$Average_price)) + geom_line() + theme_bw() +
+  xlab("Index") + ylab("Average Price")
+plot_data
+mean(datalelang.ts)
+```
+
+Plot deret waktu di atas menunjukkan bahwa data tidak stasioner dalam rataan, ditandai dengan data yang tidak menyebar di sekitar nilai tengahnya. Selain itu, tidak stasioner dalam ragam, ditandai dengan lebar pita yang cenderung berbeda (tidak sama).
+
+### Plot ACF
+
+```{r}
+acf(datalelang.ts)
+```
+
+Berdasarkan plot ACF, terlihat bahwa plot ACF pada data tersebut cenderung *tails off* dan tidak membentuk gelombang sinus. Akan tetapi, menurun secara perlahan sehingga data tidak stasioner.
+
+### Uji ADF
+
+```{r}
+tseries::adf.test(datalelang.ts)
+```
+
+$H_0$ : Data tidak stasioner dalam rataan
+
+$H_1$ : Data stasioner dalam rataan
+
+Berdasarkan uji ADF tersebut, didapat *p-value* sebesar 0.5492 yang lebih besar dari taraf nyata 5% sehingga tak tolak $H_0$ dan menandakan bahwa data tidak stasioner dalam rataan. Hal ini sesuai dengan hasil eksplorasi menggunakan plot time series dan plot ACF.
+
+### Plot Box-Cox
+
+```{r}
+n <- 204
+index <- seq(1:n)
+bc = boxcox(datalelang.ts~datalelang$index, lambda = seq(0,4,by=0.01))
+
+#Nilai Rounded Lambda
+lambda <- bc$x[which.max(bc$y)]
+lambda
+#SK
+bc$x[bc$y > max(bc$y) - 1/2 * qchisq(.95,1)]
+```
+
+Gambar di atas menunjukkan nilai *rounded value* ($\lambda$) optimum sebesar **0,73** dan pada selang kepercayaan 95% nilai memiliki batas bawah **0,52** dan batas atas **0,96**. Selang tersebut tidak memuat nilai satu sehingga dapat dikatakan bahwa data tidak stasioner dalam ragam.
+
+### Partisi Data
+
+#### Bagian 1
+
+```{r}
+dt_stas1 <- datalelang.ts[1:95] |> ts()
+mean(dt_stas1)
+var(dt_stas1)
+```
+
+#### Plot Time Series
+
+```{r}
+dt_stas1 |> as_tsibble() |> 
+  ggplot(aes(x = index, y = value)) +
+  geom_line() + theme_bw() +
+  xlab("index") + ylab("Average Price ")
+mean(datalelang.ts)
+```
+
+Plot deret waktu di atas menunjukkan bahwa data stasioner dalam rataan, ditandai dengan data yang tidak menyebar di sekitar nilai tengahnya (54358.04) dan stasioner dalam ragam, ditandai dengan lebar pita yang cenderung sama.
+
+#### Plot ACF
+
+```{r}
+acf(dt_stas1)
+```
+
+Berdasarkan plot ACF, terlihat bahwa plot ACF pada data tersebut cenderung *tails off* dan sedikit membentuk gelombang sinus.
+
+#### Uji ADF
+
+```{r}
+tseries::adf.test(dt_stas1)
+```
+
+$H_0$ : Data tidak stasioner dalam rataan
+
+$H_1$ : Data stasioner dalam rataan
+
+Berdasarkan uji ADF tersebut, didapat *p-value* sebesar 0.2731 yang lebih besar dari taraf nyata 5% sehingga tak tolak $H_0$ dan menandakan bahwa data tidak stasioner dalam rataan. Hal ini sesuai dengan hasil eksplorasi menggunakan plot time series dan plot ACF.
+
+#### Plot Boxcox
+
+```{r}
+index <- seq(1:95)
+bc = boxcox(dt_stas1~index, lambda = seq(-2,6,by=1))
+
+#Nilai Rounded Lambda
+lambda <- bc$x[which.max(bc$y)]
+lambda
+
+#SK
+bc$x[bc$y > max(bc$y) - 1/2 * qchisq(.95,1)]
+```
+
+Gambar di atas menunjukkan nilai *rounded value* ($\lambda$) optimum sebesar **0.9090909** dan pada selang kepercayaan 95% nilai memiliki batas bawah **0.4242424** dan batas atas **1.4747475**. Selang tersebut memuat nilai satu sehingga dapat dikatakan bahwa data bangkitan stasioner dalam ragam.
+
+#### Kesimpulan bagian 1
+Data bangkitan tidak stasioner dalam rataan, namun stasioner dalam ragam.
+
+#### Bagian 2
+
+```{r}
+dt_stas2 <- datalelang.ts[1:150] |> ts()
+mean(dt_stas2)
+var(dt_stas2)
+```
+
+#### Plot Time Series
+
+```{r}
+dt_stas2 |> as_tsibble() |> 
+  ggplot(aes(x = index, y = value)) +
+  geom_line() + theme_bw() +
+  xlab("index") + ylab("Average Price")
+mean(datalelang.ts)
+```
+
+Plot deret waktu di atas menunjukkan bahwa data tidak stasioner dalam rataan, ditandai dengan data yang tidak menyebar di sekitar nilai tengahnya (54358.04) dan tidak stasioner dalam ragam, ditandai dengan lebar pita yang cenderung tidak sama.
+
+#### Plot ACF
+
+```{r}
+acf(dt_stas2)
+```
+
+Berdasarkan plot ACF, terlihat bahwa plot ACF pada data tersebut cenderung *tails off* dan tidak membentuk gelombang sinus.
+
+#### Uji ADF
+
+```{r}
+adf.test(dt_stas2)
+```
+
+$H_0$ : Data tidak stasioner dalam rataan
+
+$H_1$ : Data stasioner dalam rataan
+
+Berdasarkan uji ADF tersebut, didapat *p-value* sebesar 0.6778 yang lebih besar dari taraf nyata 5% sehingga tak tolak $H_0$ dan menandakan bahwa data tidak stasioner dalam rataan. Hal ini sesuai dengan hasil eksplorasi menggunakan plot time series dan plot ACF.
+
+#### Plot Boxcox
+
+```{r}
+index <- seq(1:150)
+bc = boxcox(dt_stas2~index, lambda = seq(0,6,by=1))
+
+#Nilai Rounded Lambda
+lambda <- bc$x[which.max(bc$y)]
+lambda
+
+#SK
+bc$x[bc$y > max(bc$y) - 1/2 * qchisq(.95,1)]
+```
+
+Gambar di atas menunjukkan nilai *rounded value* ($\lambda$) optimum sebesar **0.303030** dan pada selang kepercayaan 95% nilai memiliki batas bawah **0.0606** dan batas atas **0.60606**. Selang tersebut tidak memuat nilai satu sehingga dapat dikatakan bahwa data bangkitan tidak stasioner dalam ragam.
+
+#### Kesimpulan bagian 2
+Data bangkitan tidak stasioner dalam rataan maupun ragam.
