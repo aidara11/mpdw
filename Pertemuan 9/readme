@@ -1,1 +1,7 @@
-
+```{r}
+setwd("C:/Users/LENOVO/Documents/MPDW/Praktikum 8")
+library(readxl)
+dt <- read_xlsx("Data Inflasi.xlsx")
+write.table(dt, "Data Inflasi.csv", sep=",", row.names = F)
+coba <- read.csv("Data Inflasi.csv")
+```
