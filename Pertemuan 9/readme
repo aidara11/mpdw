@@ -1,7 +1,7 @@
 `CATATAN`
 - Cara cek stasioner dalam ragam setelah penanganan
 - Kenormalan sisaan belum terpenuhi
-- Nilai MAPE masih cukup besar 32.58989
+- Nilai MAPE masih cukup besar 33.432
 - Model terbaik: ARIMA(0,1,2)
 
 
