@@ -70,7 +70,7 @@ Berdasarkan plot data deret waktu pada data latih, terlihat bahwa data cenderung
 
 ## Plot Data Uji
 ```{r}
-inflasitest <- datainflasi.ts[175:249]
+inflasitest <- datainflasi.ts[176:249]
 test.ts <- ts(inflasitest)
 plot.ts(test.ts, lty=1, xlab="Periode", ylab="Inflasi", main="Plot Test Persentase Inflasi di Indonesia tahun 2003-2023")
 ```
@@ -352,6 +352,6 @@ perbandingan.da
 accuracy(ts(hasil[-1]), head(test.ts, n=74))
 ```
 
-Didapatkan nilai MAPE sebesar 32.58989 (antara 20%-50%) yang menandakan bahwa hasil peramalan dari model ARIMA(0,1,2) cukup baik. Prediksi ini mungkin masih dapat digunakan, tetapi memerlukan perbaikan.
+Didapatkan nilai MAPE sebesar 33.432 (antara 20%-50%) yang menandakan bahwa hasil peramalan dari model ARIMA(0,1,2) cukup baik. Prediksi ini mungkin masih dapat digunakan, tetapi memerlukan perbaikan.
 
 
